@@ -2,5 +2,13 @@
 name = "zirv-macros"
 version = "0.1.0"
 edition = "2024"
+description = "A collection of useful macros for everyday programming."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/Glubiz/zirv-macros"
+documentation = "https://docs.rs/zirv-macros"
+keywords = ["macros", "rust", "programming"]
+categories = ["development-tools", "macros"]
+
 
 [dependencies]
