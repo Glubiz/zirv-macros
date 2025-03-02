@@ -2,13 +2,14 @@ name: CD Pipeline
 
 on:
   workflow_run:
-    workflows: ["CI Pipeline"]  # Replace with your exact CI workflow name.
+    workflows: ["CI Pipeline"]  # Ensure this exactly matches your CI workflow name.
     types:
       - completed
+  workflow_dispatch: {}  # Enables a manual trigger button.
 
 jobs:
   publish:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
