@@ -17,7 +17,13 @@ macro_rules! unwrap_or_log {
         match $expr {
             Ok(val) => val,
             Err(err) => {
-                eprintln!("Unwrap failed at {}:{} - {:?}. Using default: {:?}", file!(), line!(), err, $default);
+                eprintln!(
+                    "Unwrap failed at {}:{} - {:?}. Using default: {:?}",
+                    file!(),
+                    line!(),
+                    err,
+                    $default
+                );
                 $default
             }
         }
@@ -152,7 +158,11 @@ macro_rules! log_error {
 macro_rules! parse_env {
     ($var:expr, $default:expr) => {{
         std::env::var($var).unwrap_or_else(|_| {
-            tracing::warn!("Environment variable {} not set. Using default: {:?}", $var, $default);
+            tracing::warn!(
+                "Environment variable {} not set. Using default: {:?}",
+                $var,
+                $default
+            );
             $default.to_string()
         })
     }};
