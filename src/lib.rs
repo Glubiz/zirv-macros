@@ -1,61 +1,63 @@
 //! # zirv-macros
 //!
-//! The `zirv-macros` library provides a collection of custom macros designed to ease backend
-//! development in Rust—especially for projects using Actix and SQLx. These macros reduce boilerplate,
-//! enhance logging, improve error handling, and help with instrumentation and performance monitoring.
+//! The `zirv-macros` crate provides a collection of custom macros designed to ease backend
+//! development in Rust, especially for projects using Actix and SQLx. The macros help reduce boilerplate,
+//! improve logging, enhance error handling, and aid with instrumentation and performance measurement.
 //!
 //! ## Features
 //!
 //! - **Error Handling & Assertions:**
-//!   - `try_log!`: Attempts an expression returning a `Result`, logs an error on failure, and returns an error.
-//!   - `unwrap_or_log!`: Unwraps a `Result`, logging an error and returning a default value if it fails.
-//!   - `assert_msg!`: Asserts a condition, logs a message on failure, and panics.
+//!   - `try_log!`: Evaluates an expression returning a `Result`, logs on error, and returns an error.
+//!   - `unwrap_or_log!`: Unwraps a result and uses a default value if it fails, logging the error.
+//!   - `assert_msg!`: Asserts a condition with a custom error message.
 //!
 //! - **Timing & Instrumentation:**
-//!   - `time_it!`: Measures and logs the execution time of a block.
+//!   - `time_it!`: Measures and logs the execution time of a code block.
 //!   - `log_duration!`: Logs the duration of a code block using tracing.
-//!   - `span_wrap!`: Wraps a block of code in a tracing span.
-//!   - `call_with_trace!`: Calls a function wrapped in a tracing span.
+//!   - `span_wrap!`: Wraps a block of code inside a tracing span.
+//!   - `call_with_trace!`: Calls a function inside a tracing span.
 //!
 //! - **JSON & Environment Helpers:**
 //!   - `json_merge!`: Merges two JSON objects.
 //!   - `parse_env!`: Reads an environment variable with a default fallback.
-//!   - `pretty_debug!`: Pretty prints a JSON representation of an object.
+//!   - `pretty_debug!`: Pretty-prints a JSON representation of an object.
 //!
 //! - **SQL Debugging:**
-//!   - `debug_query!`: Logs the full SQL query string before execution.
+//!   - `debug_query!`: Logs the full SQL query string before executing it.
 //!
 //! - **Retry Utilities:**
 //!   - `with_retry!`: Synchronously retries an expression a fixed number of times.
 //!   - `retry_async!`: Asynchronously retries an expression a fixed number of times.
 //!
-//! ## Installation
+//! ## Usage
 //!
-//! Add `zirv-macros` as a dependency in your Cargo.toml (either via crates.io or as a path dependency):
+//! Add `zirv-macros` as a dependency in your Cargo.toml and import the macros:
 //!
 //! ```toml
 //! [dependencies]
 //! zirv-macros = { path = "../zirv-macros" }
 //! ```
 //!
-//! Then import the macros in your project with:
-//!
 //! ```rust
 //! use zirv_macros::*;
 //! ```
 //!
-//! ## Examples
-//!
-//! See the usage examples in the README below.
+//! See the examples below for details.
 
 /// Attempts to evaluate an expression returning a `Result`.
 /// If the result is `Ok`, returns the value.
-/// Otherwise, logs an error with file and line info and returns an error as a String.
+/// Otherwise, logs an error with file and line info and returns an error as a `String`.
 ///
 /// # Examples
 ///
 /// ```rust
-/// let value = try_log!(Ok(42));
+/// # use std::error::Error;
+/// # use zirv_macros::*;
+/// fn main() -> Result<(), String> {
+///     let value = try_log!(Ok::<u32, Box<dyn Error>>(42));
+///     assert_eq!(value, 42);
+///     Ok(())
+/// }
 /// ```
 #[macro_export]
 macro_rules! try_log {
@@ -76,7 +78,9 @@ macro_rules! try_log {
 /// # Examples
 ///
 /// ```rust
-/// let value = unwrap_or_log!(Ok("value".to_string()), "default".to_string());
+/// # use zirv_macros::*;
+/// let value = unwrap_or_log!(Ok::<String, &str>("value".to_string()), "default".to_string());
+/// assert_eq!(value, "value".to_string());
 /// ```
 #[macro_export]
 macro_rules! unwrap_or_log {
@@ -102,10 +106,9 @@ macro_rules! unwrap_or_log {
 /// # Examples
 ///
 /// ```rust
-/// let result = time_it!("Computation", {
-///     // some code
-///     42
-/// });
+/// # use zirv_macros::*;
+/// let result = time_it!("Computation", { 42 });
+/// assert_eq!(result, 42);
 /// ```
 #[macro_export]
 macro_rules! time_it {
@@ -118,17 +121,20 @@ macro_rules! time_it {
     }};
 }
 
-/// Merges two serde_json::Value objects (expected to be JSON objects).
+/// Merges two `serde_json::Value` objects (expected to be JSON objects).
 /// Keys in the second object override those in the first.
 ///
 /// # Examples
 ///
 /// ```rust
+/// # use zirv_macros::*;
 /// use serde_json::json;
 /// let a = json!({ "a": 1, "b": 2 });
 /// let b = json!({ "b": 3, "c": 4 });
 /// let merged = json_merge!(a, b);
-/// // merged: { "a": 1, "b": 3, "c": 4 }
+/// assert_eq!(merged["a"], 1);
+/// assert_eq!(merged["b"], 3);
+/// assert_eq!(merged["c"], 4);
 /// ```
 #[macro_export]
 macro_rules! json_merge {
@@ -149,8 +155,14 @@ macro_rules! json_merge {
 /// # Examples
 ///
 /// ```rust
-/// let query = sqlx::query("SELECT * FROM users WHERE id = ?").bind(42);
-/// let query = debug_query!(query);
+/// # use zirv_macros::*;
+/// // Dummy struct to simulate a query with a sql() method.
+/// struct DummyQuery { sql: &'static str }
+/// impl DummyQuery {
+///     fn sql(&self) -> &str { self.sql }
+/// }
+/// let query = DummyQuery { sql: "SELECT * FROM users" };
+/// let _ = debug_query!(query);
 /// ```
 #[macro_export]
 macro_rules! debug_query {
@@ -161,13 +173,16 @@ macro_rules! debug_query {
     }};
 }
 
-/// Retries a synchronous expression (returning a Result) a specified number of times,
+/// Retries a synchronous expression (returning a `Result`) a specified number of times,
 /// waiting a fixed number of milliseconds between attempts.
 ///
 /// # Examples
 ///
 /// ```rust
-/// let result = with_retry!(3, 100, some_fallible_operation());
+/// # use zirv_macros::*;
+/// fn dummy_op() -> Result<u32, &'static str> { Ok(42) }
+/// let result = with_retry!(3, 10, dummy_op());
+/// assert_eq!(result.unwrap(), 42);
 /// ```
 #[macro_export]
 macro_rules! with_retry {
@@ -188,14 +203,20 @@ macro_rules! with_retry {
     }};
 }
 
-/// Retries an asynchronous expression (returning a Result) a specified number of times,
+/// Retries an asynchronous expression (returning a `Result`) a specified number of times,
 /// waiting a fixed number of milliseconds between attempts.
-/// Uses tokio::time::sleep.
+/// Uses `tokio::time::sleep`.
 ///
 /// # Examples
 ///
 /// ```rust
-/// let result = retry_async!(3, 100, async { some_async_operation().await });
+/// # use zirv_macros::*;
+/// # async fn dummy_async_op() -> Result<u32, &'static str> { Ok(42) }
+/// # #[tokio::main]
+/// # async fn main() {
+/// let result = retry_async!(3, 10, dummy_async_op());
+/// assert_eq!(result.unwrap(), 42);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! retry_async {
@@ -222,8 +243,9 @@ macro_rules! retry_async {
 /// # Examples
 ///
 /// ```rust
+/// # use zirv_macros::*;
 /// span_wrap!("my_span", {
-///     println!("Inside the span");
+///     println!("Inside span");
 /// });
 /// ```
 #[macro_export]
@@ -241,10 +263,9 @@ macro_rules! span_wrap {
 /// # Examples
 ///
 /// ```rust
-/// let result = log_duration!("Query time", {
-///     // your code here
-///     42
-/// });
+/// # use zirv_macros::*;
+/// let result = log_duration!("test", { 42 });
+/// assert_eq!(result, 42);
 /// ```
 #[macro_export]
 macro_rules! log_duration {
@@ -262,7 +283,10 @@ macro_rules! log_duration {
 /// # Examples
 ///
 /// ```rust
-/// let result = call_with_trace!("processing", process_data, arg1, arg2);
+/// # use zirv_macros::*;
+/// fn add(a: i32, b: i32) -> i32 { a + b }
+/// let result = call_with_trace!("processing", add, 2, 3);
+/// assert_eq!(result, 5);
 /// ```
 #[macro_export]
 macro_rules! call_with_trace {
@@ -277,7 +301,9 @@ macro_rules! call_with_trace {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,should_panic
+/// # use zirv_macros::*;
+/// let value = 0;
 /// assert_msg!(value > 0, "Value must be positive");
 /// ```
 #[macro_export]
@@ -290,13 +316,16 @@ macro_rules! assert_msg {
     };
 }
 
-/// Attempts to evaluate an expression returning a Result and logs an error if it fails,
+/// Attempts to evaluate an expression returning a `Result` and logs an error if it fails,
 /// returning a default value instead.
 ///
 /// # Examples
 ///
 /// ```rust
-/// let value = log_error!(compute_value(), 0);
+/// # use zirv_macros::*;
+/// fn fail_op() -> Result<u32, &'static str> { Err("failure") }
+/// let value = log_error!(fail_op(), 0);
+/// assert_eq!(value, 0);
 /// ```
 #[macro_export]
 macro_rules! log_error {
@@ -311,12 +340,18 @@ macro_rules! log_error {
     }};
 }
 
-/// Attempts to read an environment variable. If not set, logs a warning and returns a default value as a String.
+/// Attempts to read an environment variable. If the variable is not set,
+/// logs a warning and returns a default value as a String.
 ///
 /// # Examples
 ///
 /// ```rust
-/// let port = parse_env!("PORT", "3000");
+/// # use zirv_macros::*;
+/// unsafe {
+/// std::env::remove_var("TEST_VAR");
+/// }
+/// let value = parse_env!("TEST_VAR", "default");
+/// assert_eq!(value, "default".to_string());
 /// ```
 #[macro_export]
 macro_rules! parse_env {
@@ -337,7 +372,9 @@ macro_rules! parse_env {
 /// # Examples
 ///
 /// ```rust
-/// pretty_debug!(my_data);
+/// # use zirv_macros::*;
+/// let data = serde_json::json!({ "a": 1, "b": 2 });
+/// pretty_debug!(data);
 /// ```
 #[macro_export]
 macro_rules! pretty_debug {
