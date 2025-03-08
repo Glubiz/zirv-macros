@@ -1,6 +1,6 @@
 [package]
 name = "zirv-macros"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A collection of useful macros for everyday programming."
 license = "MIT OR Apache-2.0"
