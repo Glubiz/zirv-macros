@@ -5,7 +5,7 @@ macro_rules! try_log {
             Ok(val) => val,
             Err(err) => {
                 eprintln!("Error at {}:{} - {:?}", file!(), line!(), err);
-                return Err(err.into());
+                return Err(err.to_string());
             }
         }
     };
@@ -180,6 +180,7 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::env;
+    use std::error::Error;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
 
@@ -187,7 +188,7 @@ mod tests {
     #[test]
     fn test_try_log_ok() {
         fn test_fn() -> Result<i32, String> {
-            let x = try_log!(Ok(10));
+            let x = try_log!(Ok::<_, Box<dyn Error>>(10));
             Ok(x)
         }
         assert_eq!(test_fn().unwrap(), 10);
@@ -245,7 +246,9 @@ mod tests {
     }
     impl DummyQuery {
         fn new(sql: &str) -> Self {
-            DummyQuery { sql: sql.to_string() }
+            DummyQuery {
+                sql: sql.to_string(),
+            }
         }
         fn sql(&self) -> &str {
             &self.sql
@@ -275,17 +278,15 @@ mod tests {
 
     #[test]
     fn test_with_retry_failure() {
-        let res: Result<&str, &str> = with_retry!(2, 10, {
-            Err("always fails")
-        });
+        let res: Result<&str, &str> = with_retry!(2, 10, { Err("always fails") });
         assert!(res.is_err());
     }
 
     // Test retry_async! macro.
     #[tokio::test]
     async fn test_retry_async_success() {
-        use tokio::sync::Mutex;
         use std::sync::Arc;
+        use tokio::sync::Mutex;
         let attempts = Arc::new(Mutex::new(0));
         let res = retry_async!(3, 10, {
             let attempts = attempts.clone();
@@ -298,33 +299,27 @@ mod tests {
                     Ok("success")
                 }
             }
-        }).await;
+        });
         assert_eq!(res.unwrap(), "success");
     }
 
     #[tokio::test]
     async fn test_retry_async_failure() {
-        let res: Result<&str, &str> = retry_async!(2, 10, async {
-            Err("fail")
-        }).await;
+        let res: Result<&str, &str> = retry_async!(2, 10, async { Err("fail") });
         assert!(res.is_err());
     }
 
     // Test span_wrap! macro.
     #[test]
     fn test_span_wrap() {
-        let value = span_wrap!("test_span", {
-            123
-        });
+        let value = span_wrap!("test_span", { 123 });
         assert_eq!(value, 123);
     }
 
     // Test log_duration! macro.
     #[test]
     fn test_log_duration() {
-        let value = log_duration!("duration test", {
-            456
-        });
+        let value = log_duration!("duration test", { 456 });
         assert_eq!(value, 456);
     }
 
@@ -360,10 +355,14 @@ mod tests {
     #[test]
     fn test_parse_env() {
         // Set an environment variable temporarily.
-        env::set_var("TEST_VAR", "value1");
+        unsafe {
+            env::set_var("TEST_VAR", "value1");
+        }
         let result = parse_env!("TEST_VAR", "default");
         assert_eq!(result, "value1".to_string());
-        env::remove_var("TEST_VAR");
+        unsafe {
+            env::remove_var("TEST_VAR");
+        }
 
         // Now TEST_VAR is not set, so we get the default.
         let result = parse_env!("TEST_VAR", "default");
