@@ -1,3 +1,62 @@
+//! # zirv-macros
+//!
+//! The `zirv-macros` library provides a collection of custom macros designed to ease backend
+//! development in Rust—especially for projects using Actix and SQLx. These macros reduce boilerplate,
+//! enhance logging, improve error handling, and help with instrumentation and performance monitoring.
+//!
+//! ## Features
+//!
+//! - **Error Handling & Assertions:**
+//!   - `try_log!`: Attempts an expression returning a `Result`, logs an error on failure, and returns an error.
+//!   - `unwrap_or_log!`: Unwraps a `Result`, logging an error and returning a default value if it fails.
+//!   - `assert_msg!`: Asserts a condition, logs a message on failure, and panics.
+//!
+//! - **Timing & Instrumentation:**
+//!   - `time_it!`: Measures and logs the execution time of a block.
+//!   - `log_duration!`: Logs the duration of a code block using tracing.
+//!   - `span_wrap!`: Wraps a block of code in a tracing span.
+//!   - `call_with_trace!`: Calls a function wrapped in a tracing span.
+//!
+//! - **JSON & Environment Helpers:**
+//!   - `json_merge!`: Merges two JSON objects.
+//!   - `parse_env!`: Reads an environment variable with a default fallback.
+//!   - `pretty_debug!`: Pretty prints a JSON representation of an object.
+//!
+//! - **SQL Debugging:**
+//!   - `debug_query!`: Logs the full SQL query string before execution.
+//!
+//! - **Retry Utilities:**
+//!   - `with_retry!`: Synchronously retries an expression a fixed number of times.
+//!   - `retry_async!`: Asynchronously retries an expression a fixed number of times.
+//!
+//! ## Installation
+//!
+//! Add `zirv-macros` as a dependency in your Cargo.toml (either via crates.io or as a path dependency):
+//!
+//! ```toml
+//! [dependencies]
+//! zirv-macros = { path = "../zirv-macros" }
+//! ```
+//!
+//! Then import the macros in your project with:
+//!
+//! ```rust
+//! use zirv_macros::*;
+//! ```
+//!
+//! ## Examples
+//!
+//! See the usage examples in the README below.
+
+/// Attempts to evaluate an expression returning a `Result`.
+/// If the result is `Ok`, returns the value.
+/// Otherwise, logs an error with file and line info and returns an error as a String.
+///
+/// # Examples
+///
+/// ```rust
+/// let value = try_log!(Ok(42));
+/// ```
 #[macro_export]
 macro_rules! try_log {
     ($expr:expr) => {
@@ -11,6 +70,14 @@ macro_rules! try_log {
     };
 }
 
+/// Attempts to unwrap a result, returning a default value if an error occurs.
+/// Logs an error with file and line info if the unwrap fails.
+///
+/// # Examples
+///
+/// ```rust
+/// let value = unwrap_or_log!(Ok("value".to_string()), "default".to_string());
+/// ```
 #[macro_export]
 macro_rules! unwrap_or_log {
     ($expr:expr, $default:expr) => {
@@ -30,6 +97,16 @@ macro_rules! unwrap_or_log {
     };
 }
 
+/// Measures the execution time of a block of code and prints the duration with the provided label.
+///
+/// # Examples
+///
+/// ```rust
+/// let result = time_it!("Computation", {
+///     // some code
+///     42
+/// });
+/// ```
 #[macro_export]
 macro_rules! time_it {
     ($label:expr, $block:block) => {{
@@ -41,6 +118,18 @@ macro_rules! time_it {
     }};
 }
 
+/// Merges two serde_json::Value objects (expected to be JSON objects).
+/// Keys in the second object override those in the first.
+///
+/// # Examples
+///
+/// ```rust
+/// use serde_json::json;
+/// let a = json!({ "a": 1, "b": 2 });
+/// let b = json!({ "b": 3, "c": 4 });
+/// let merged = json_merge!(a, b);
+/// // merged: { "a": 1, "b": 3, "c": 4 }
+/// ```
 #[macro_export]
 macro_rules! json_merge {
     ($base:expr, $other:expr) => {{
@@ -54,6 +143,15 @@ macro_rules! json_merge {
     }};
 }
 
+/// Logs the SQL query string (and optionally its bind parameters) before executing it.
+/// Useful for debugging SQLx queries.
+///
+/// # Examples
+///
+/// ```rust
+/// let query = sqlx::query("SELECT * FROM users WHERE id = ?").bind(42);
+/// let query = debug_query!(query);
+/// ```
 #[macro_export]
 macro_rules! debug_query {
     ($query:expr) => {{
@@ -63,6 +161,14 @@ macro_rules! debug_query {
     }};
 }
 
+/// Retries a synchronous expression (returning a Result) a specified number of times,
+/// waiting a fixed number of milliseconds between attempts.
+///
+/// # Examples
+///
+/// ```rust
+/// let result = with_retry!(3, 100, some_fallible_operation());
+/// ```
 #[macro_export]
 macro_rules! with_retry {
     ($retries:expr, $delay_ms:expr, $expr:expr) => {{
@@ -82,6 +188,15 @@ macro_rules! with_retry {
     }};
 }
 
+/// Retries an asynchronous expression (returning a Result) a specified number of times,
+/// waiting a fixed number of milliseconds between attempts.
+/// Uses tokio::time::sleep.
+///
+/// # Examples
+///
+/// ```rust
+/// let result = retry_async!(3, 100, async { some_async_operation().await });
+/// ```
 #[macro_export]
 macro_rules! retry_async {
     ($retries:expr, $delay_ms:expr, $async_expr:expr) => {{
@@ -102,6 +217,15 @@ macro_rules! retry_async {
     }};
 }
 
+/// Wraps a block of code in a tracing span with the given name, enabling automatic instrumentation.
+///
+/// # Examples
+///
+/// ```rust
+/// span_wrap!("my_span", {
+///     println!("Inside the span");
+/// });
+/// ```
 #[macro_export]
 macro_rules! span_wrap {
     ($span_name:expr, $block:block) => {{
@@ -111,6 +235,17 @@ macro_rules! span_wrap {
     }};
 }
 
+/// Logs the duration of a code block using tracing.
+/// Executes the block, logs the elapsed time with the provided label, and returns the result.
+///
+/// # Examples
+///
+/// ```rust
+/// let result = log_duration!("Query time", {
+///     // your code here
+///     42
+/// });
+/// ```
 #[macro_export]
 macro_rules! log_duration {
     ($label:expr, $block:block) => {{
@@ -122,6 +257,13 @@ macro_rules! log_duration {
     }};
 }
 
+/// Calls a function with the provided arguments, wrapping the call in a tracing span with the specified name.
+///
+/// # Examples
+///
+/// ```rust
+/// let result = call_with_trace!("processing", process_data, arg1, arg2);
+/// ```
 #[macro_export]
 macro_rules! call_with_trace {
     ($span_name:expr, $func:expr $(, $args:expr)*) => {{
@@ -131,6 +273,13 @@ macro_rules! call_with_trace {
     }};
 }
 
+/// Asserts a condition and logs an error with a custom message if it fails, then panics.
+///
+/// # Examples
+///
+/// ```rust
+/// assert_msg!(value > 0, "Value must be positive");
+/// ```
 #[macro_export]
 macro_rules! assert_msg {
     ($cond:expr, $msg:expr) => {
@@ -141,6 +290,14 @@ macro_rules! assert_msg {
     };
 }
 
+/// Attempts to evaluate an expression returning a Result and logs an error if it fails,
+/// returning a default value instead.
+///
+/// # Examples
+///
+/// ```rust
+/// let value = log_error!(compute_value(), 0);
+/// ```
 #[macro_export]
 macro_rules! log_error {
     ($expr:expr, $default:expr) => {{
@@ -154,6 +311,13 @@ macro_rules! log_error {
     }};
 }
 
+/// Attempts to read an environment variable. If not set, logs a warning and returns a default value as a String.
+///
+/// # Examples
+///
+/// ```rust
+/// let port = parse_env!("PORT", "3000");
+/// ```
 #[macro_export]
 macro_rules! parse_env {
     ($var:expr, $default:expr) => {{
@@ -168,6 +332,13 @@ macro_rules! parse_env {
     }};
 }
 
+/// Prints a pretty-printed JSON representation of an object that implements Serialize.
+///
+/// # Examples
+///
+/// ```rust
+/// pretty_debug!(my_data);
+/// ```
 #[macro_export]
 macro_rules! pretty_debug {
     ($obj:expr) => {
